@@ -1,0 +1,21 @@
+{
+  "daemon": "halfmetre_cam",
+  "pipeline_daemon": "halfmetre_pipeline",
+  "pipeline_handover_timeout": 10,
+  "log_name": "qhy_camd@halfmetre",
+  "control_machines": ["HalfMetreTCS"],
+  "client_commands_module": "rockit.camera.moravian",
+  "camera_serial": 10015,
+  "cooler_setpoint": 0,
+  "cooler_update_delay": 5,
+  "cooler_pwm_step": 3,
+  "worker_processes": 3,
+  "framebuffer_bytes": 1514004480,
+  "gain": 2750,
+  "binning": 1,
+  "header_card_capacity": 144,
+  "camera_id": "H400",
+  "output_path": "/data/incoming/",
+  "output_prefix": "halfmetre",
+  "expcount_path": "/data/h400-counter.json"
+}

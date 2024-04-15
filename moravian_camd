@@ -1,0 +1,278 @@
+#!/usr/bin/env python3
+#
+# This file is part of the Robotic Observatory Control Kit (rockit)
+#
+# rockit is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# rockit is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with rockit.  If not, see <http://www.gnu.org/licenses/>.
+
+"""Daemon for controlling a Moravian C1X camera via Pyro"""
+
+# pylint: disable=too-many-arguments
+# pylint: disable=too-many-return-statements
+# pylint: disable=too-many-instance-attributes
+# pylint: disable=too-many-lines
+# pylint: disable=too-many-branches
+# pylint: disable=too-many-statements
+
+import argparse
+from ctypes import c_bool
+from multiprocessing import Process, Queue, Value, Pipe
+from multiprocessing.sharedctypes import RawArray
+import queue
+import threading
+import Pyro4
+from rockit.common import TryLock
+from rockit.common.helpers import pyro_client_matches
+from rockit.camera.moravian import Config, CommandStatus, CameraStatus, output_process, moravian_process
+
+
+class CameraDaemon:
+    """Daemon interface for andor camera"""
+    def __init__(self, config):
+        self._config = config
+        self._command_lock = threading.Lock()
+
+        # All the actual camera communication is handled through a separate process, which is created
+        # in the initialize method and terminated in the shutdown method. This ensures that all internal
+        # SDK state is reinitialized without having to restart the entire daemon.
+        self._cam_process = self._cam_pipe = None
+        self._cam_lock = threading.Lock()
+
+        # Subprocesses for processing acquired frames
+        self._processing_queue = Queue()
+        self._processing_framebuffer = RawArray('B', config.framebuffer_bytes)
+        self._processing_framebuffer_offsets = Queue()
+        self._processing_stop_signal = Value(c_bool, False)
+
+        for _ in range(config.worker_processes):
+            Process(target=output_process, daemon=True, args=(
+                self._processing_queue, self._processing_framebuffer, self._processing_framebuffer_offsets,
+                self._processing_stop_signal, config.camera_id, config.camera_serial,
+                config.header_card_capacity, config.output_path, config.log_name,
+                config.pipeline_daemon_name, config.pipeline_handover_timeout)).start()
+
+    def cam_command(self, command, oneway=False, **kwargs):
+        """Send a command to the camera process and return the response"""
+        with self._cam_lock:
+            if self._cam_process is None or not self._cam_process.is_alive():
+                return CommandStatus.CameraNotInitialized
+
+            self._cam_pipe.send({
+                'command': command,
+                'args': kwargs
+            })
+
+            if oneway:
+                return CommandStatus.Succeeded
+
+            return self._cam_pipe.recv()
+
+    @Pyro4.expose
+    def initialize(self):
+        """Connects to the camera driver"""
+        if not pyro_client_matches(self._config.control_ips):
+            return CommandStatus.InvalidControlIP
+
+        with TryLock(self._command_lock) as success:
+            if not success:
+                return CommandStatus.Blocked
+
+            with self._cam_lock:
+                if self._cam_process is not None and self._cam_process.is_alive():
+                    return CommandStatus.CameraNotUninitialized
+
+                self._cam_pipe, camd_pipe = Pipe()
+                self._cam_process = Process(target=moravian_process, args=(
+                    camd_pipe, self._config,
+                    self._processing_queue,
+                    self._processing_framebuffer, self._processing_framebuffer_offsets,
+                    self._processing_stop_signal
+                ), daemon=True)
+
+                self._cam_process.start()
+                return self._cam_pipe.recv()
+
+    @Pyro4.expose
+    def shutdown(self):
+        """Disconnects from the camera driver"""
+        if not pyro_client_matches(self._config.control_ips):
+            return CommandStatus.InvalidControlIP
+
+        with TryLock(self._command_lock) as success:
+            if not success:
+                return CommandStatus.Blocked
+
+            if self._cam_process is None:
+                return CommandStatus.CameraNotInitialized
+
+            self.cam_command('shutdown', oneway=True)
+
+            with self._cam_lock:
+                # The pyro timeout is usually set to 5s,
+                # so allow a little time to terminate the process if needed
+                self._cam_process.join(4.5)
+                if self._cam_process.exitcode is None:
+                    print('force-terminating cam process')
+                    self._cam_process.terminate()
+
+                    # Clean up dirty state
+                    while not self._processing_queue.empty():
+                        try:
+                            self._processing_queue.get(block=False)
+                        except queue.Empty:
+                            continue
+
+                    while not self._processing_framebuffer_offsets.empty():
+                        try:
+                            self._processing_framebuffer_offsets.get(block=False)
+                        except queue.Empty:
+                            continue
+
+            return CommandStatus.Succeeded
+
+    @Pyro4.expose
+    def report_status(self):
+        """Returns a dictionary containing the current camera state"""
+        data = self.cam_command('status')
+        if isinstance(data, dict):
+            return data
+
+        return {'state': CameraStatus.Disabled}
+
+    @Pyro4.expose
+    def set_target_temperature(self, temperature, quiet=False):
+        """Set the target camera temperature"""
+        if not pyro_client_matches(self._config.control_ips):
+            return CommandStatus.InvalidControlIP
+
+        with TryLock(self._command_lock) as success:
+            if not success:
+                return CommandStatus.Blocked
+
+            return self.cam_command('temperature', temperature=temperature, quiet=quiet)
+
+    @Pyro4.expose
+    def set_exposure(self, seconds, quiet=False):
+        """Set the exposure time in seconds"""
+        if not pyro_client_matches(self._config.control_ips):
+            return CommandStatus.InvalidControlIP
+
+        with TryLock(self._command_lock) as success:
+            if not success:
+                return CommandStatus.Blocked
+
+            return self.cam_command('exposure', exposure=seconds, quiet=quiet)
+
+    @Pyro4.expose
+    def set_window(self, window, quiet=False):
+        """Sets the sensor readout window in unbinned 1-indexed pixels"""
+        if not pyro_client_matches(self._config.control_ips):
+            return CommandStatus.InvalidControlIP
+
+        with TryLock(self._command_lock) as success:
+            if not success:
+                return CommandStatus.Blocked
+
+            return self.cam_command('window', window=window, quiet=quiet)
+
+    @Pyro4.expose
+    def set_binning(self, binning, quiet=False):
+        """Sets the sensor binning factor"""
+        if not pyro_client_matches(self._config.control_ips):
+            return CommandStatus.InvalidControlIP
+
+        with TryLock(self._command_lock) as success:
+            if not success:
+                return CommandStatus.Blocked
+
+            return self.cam_command('binning', binning=binning, quiet=quiet)
+
+    @Pyro4.expose
+    def set_gain(self, gain, quiet=False):
+        """Set the sensor gain value"""
+        if not pyro_client_matches(self._config.control_ips):
+            return CommandStatus.InvalidControlIP
+
+        with TryLock(self._command_lock) as success:
+            if not success:
+                return CommandStatus.Blocked
+
+            return self.cam_command('gain', gain=gain, quiet=quiet)
+
+    @Pyro4.expose
+    def configure(self, params, quiet=False):
+        """Set camera configuration to the requested state
+           params should be a dictionary with the following keys:
+              temperature: Temperature set point
+              exposure: Exposure time in seconds
+              window: Tuple of 1-indexed (x1, x2, y1, y2)
+              bin: number of pixels to bin in x,y
+              gain: Gain setting
+           Any properties not specified in params will be reset to its default
+
+           The params dictionary should be validated using the
+           schema returned by the configure_validation_schema helper
+
+            Set quiet=True to disable log messages
+        """
+        if not pyro_client_matches(self._config.control_ips):
+            return CommandStatus.InvalidControlIP
+
+        with TryLock(self._command_lock) as success:
+            if not success:
+                return CommandStatus.Blocked
+
+            temperature = params.get('temperature', self._config.cooler_setpoint)
+            self.cam_command('temperature', temperature=temperature, quiet=quiet)
+
+            exposure = params.get('exposure', 1)
+            self.cam_command('exposure', exposure=exposure, quiet=quiet)
+
+            window = params.get('window', None)
+            self.cam_command('window', window=window, quiet=quiet)
+
+            binning = params.get('bin', self._config.binning)
+            self.cam_command('binning', binning=binning, quiet=quiet)
+
+            gain = params.get('gain', self._config.gain)
+            self.cam_command('gain', gain=gain, quiet=quiet)
+
+            return CommandStatus.Succeeded
+
+    @Pyro4.expose
+    def start_sequence(self, count, quiet=False):
+        """Starts an exposure sequence with a set number of frames, or 0 to run until stopped"""
+        if not pyro_client_matches(self._config.control_ips):
+            return CommandStatus.InvalidControlIP
+
+        with TryLock(self._command_lock) as success:
+            if not success:
+                return CommandStatus.Blocked
+
+            return self.cam_command('start', count=count, quiet=quiet)
+
+    @Pyro4.expose
+    def stop_sequence(self, quiet=False):
+        """Stops any active exposure sequence"""
+        if not pyro_client_matches(self._config.control_ips):
+            return CommandStatus.InvalidControlIP
+
+        return self.cam_command('stop', quiet=quiet)
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description='Camera control daemon')
+    parser.add_argument('config', help='Path to configuration json file')
+    args = parser.parse_args()
+    c = Config(args.config)
+    c.daemon.launch(CameraDaemon(c))
