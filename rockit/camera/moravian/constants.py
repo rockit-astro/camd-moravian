@@ -19,8 +19,6 @@
 # pylint: disable=too-few-public-methods
 # pylint: disable=invalid-name
 
-from rockit.common import TFmt
-
 
 class CommandStatus:
     """Numeric return codes"""
@@ -86,14 +84,14 @@ class CameraStatus:
         6: 'ABORTING'
     }
 
-    _formats = {
-        0: TFmt.Red + TFmt.Bold,
-        1: TFmt.Red + TFmt.Bold,
-        2: TFmt.Bold,
-        3: TFmt.Yellow + TFmt.Bold,
-        4: TFmt.Green + TFmt.Bold,
-        5: TFmt.Yellow + TFmt.Bold,
-        6: TFmt.Red + TFmt.Bold
+    _colors = {
+        0: 'red',
+        1: 'red',
+        2: 'default',
+        3: 'yellow',
+        4: 'green',
+        5: 'yellow',
+        6: 'red'
     }
 
     @classmethod
@@ -103,49 +101,9 @@ class CameraStatus:
         Set formatting=true to enable terminal formatting characters
         """
         if formatting:
-            if status in cls._formats and status in cls._formats:
-                return cls._formats[status] + cls._labels[status] + TFmt.Clear
-            return TFmt.Red + TFmt.Bold + 'UNKNOWN STATUS' + TFmt.Clear
-
-        if status in cls._labels:
-            return cls._labels[status]
-        return 'UNKNOWN STATUS'
-
-
-class CoolerMode:
-    """Camera temperature control mode"""
-    Unknown, Warm, Warming, Cooling, Locking, Locked, UVLOError = range(7)
-
-    _labels = {
-        0: 'UNKNOWN',
-        1: 'WARM',
-        2: 'WARMING',
-        3: 'COOLING',
-        4: 'LOCKING',
-        5: 'LOCKED',
-        6: 'UVLO ERROR'
-    }
-
-    _formats = {
-        0: TFmt.Red + TFmt.Bold,
-        1: TFmt.Red + TFmt.Bold,
-        2: TFmt.Yellow + TFmt.Bold,
-        3: TFmt.Cyan + TFmt.Bold,
-        4: TFmt.Yellow + TFmt.Bold,
-        5: TFmt.Green + TFmt.Bold,
-        6: TFmt.Red + TFmt.Bold
-    }
-
-    @classmethod
-    def label(cls, status, formatting=False):
-        """
-        Returns a human readable string describing a status
-        Set formatting=true to enable terminal formatting characters
-        """
-        if formatting:
-            if status in cls._formats and status in cls._formats:
-                return cls._formats[status] + cls._labels[status] + TFmt.Clear
-            return TFmt.Red + TFmt.Bold + 'UNKNOWN' + TFmt.Clear
+            if status in cls._labels and status in cls._colors:
+                return f'[b][{cls._colors[status]}]{cls._labels[status]}[/{cls._colors[status]}][/b]'
+            return '[b][red]UNKNOWN[/red][/b]'
 
         if status in cls._labels:
             return cls._labels[status]

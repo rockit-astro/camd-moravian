@@ -17,9 +17,9 @@
 """client command input handlers"""
 
 import Pyro4
-from rockit.common import TFmt
+from rockit.common import print
 from .config import Config
-from .constants import CommandStatus, CameraStatus, CoolerMode
+from .constants import CommandStatus, CameraStatus
 
 
 def run_client_command(config_path, usage_prefix, args):
@@ -79,30 +79,30 @@ def status(config, *_):
     state_desc = CameraStatus.label(data['state'], True)
     if data['state'] == CameraStatus.Acquiring:
         progress = f'{data["exposure_progress"]:.1f} / {data["exposure_time"]:.1f}s'
-        state_desc += ' (' + TFmt.Bold + progress + TFmt.Clear + ')'
+        state_desc += f' ([b]{progress}[/b])'
 
     # Camera is disabled
     print(f'   Camera is {state_desc}')
     if data['state'] != CameraStatus.Disabled:
         if data['state'] > CameraStatus.Idle:
             if data['sequence_frame_limit'] > 0:
-                print(f'   Acquiring frame {TFmt.Bold}{data["sequence_frame_count"] + 1}' +
-                      f' / {data["sequence_frame_limit"]}{TFmt.Clear}')
+                print(f'   Acquiring frame [b]{data["sequence_frame_count"] + 1}' +
+                      f' / {data["sequence_frame_limit"]}[/b]')
             else:
-                print(f'   Acquiring {TFmt.Bold}UNTIL STOPPED{TFmt.Clear}')
+                print('   Acquiring [b]UNTIL STOPPED[/b]')
 
-        print(f'   Temperature is {TFmt.Bold}{data["chip_temp"]:.0f}\u00B0C{TFmt.Clear}' +
-              f' ({TFmt.Bold}{data["cooler_power"]*100:.0f}{TFmt.Clear}% power)')
+        print(f'   Temperature is [b]{data["chip_temp"]:.0f}\u00B0C[/b]' +
+              f' ([b]{data["cooler_power"]*100:.0f}[/b]% power)')
 
         if data['cooler_setpoint'] is not None:
-            print(f'   Temperature set point is {TFmt.Bold}{data["cooler_setpoint"]:.0f}\u00B0C{TFmt.Clear}')
+            print(f'   Temperature set point is [b]{data["cooler_setpoint"]:.0f}\u00B0C[/b]')
 
-        print(f'   Exposure time is {TFmt.Bold}{data["exposure_time"]:.3f} s{TFmt.Clear}')
-        gps_status = TFmt.Green + 'LOCKED' if data["gps_fix"] else TFmt.Red + 'NOT LOCKED'
-        print(f'   GPS is {TFmt.Bold}{gps_status}{TFmt.Clear} ({TFmt.Bold}{data["gps_satellites"]}{TFmt.Clear} sats)')
+        print(f'   Exposure time is [b]{data["exposure_time"]:.3f} s[/b]')
+        gps_status = '[green]LOCKED[/green]' if data['gps_fix'] else '[red]NOT LOCKED[/red]'
+        print(f'   GPS is [b]{gps_status}[/b] ([b]{data["gps_satellites"]}[/b] sats)')
         w = [x + 1 for x in data['window']]
-        print(f'   Output window is {TFmt.Bold}[{w[0]}:{w[1]},{w[2]}:{w[3]}]{TFmt.Clear}')
-        print(f'   Binning is {TFmt.Bold}{data["binning"]}x{data["binning"]}{TFmt.Clear}')
+        print(f'   Output window is [b]\\[{w[0]}:{w[1]},{w[2]}:{w[3]}][/b]')
+        print(f'   Binning is [b]{data["binning"]}x{data["binning"]}[/b]')
     return 0
 
 

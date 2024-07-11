@@ -28,7 +28,6 @@ import json
 import pathlib
 import sys
 import threading
-import time
 import traceback
 from astropy.time import Time
 import astropy.units as u

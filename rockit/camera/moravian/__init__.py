@@ -18,6 +18,6 @@
 
 from .client import run_client_command
 from .config import Config
-from .constants import CommandStatus, CameraStatus, CoolerMode
+from .constants import CommandStatus, CameraStatus
 from .outputprocess import output_process
 from .moravianprocess import moravian_process
