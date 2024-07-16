@@ -37,7 +37,8 @@ class CommandStatus:
     CameraNotAcquiring = 15
 
     TemperatureOutsideLimits = 20
-    GainOutsideLimits = 21
+    InvalidFilter = 21
+    GainOutsideLimits = 22
     WindowOutsideSensor = 32
 
     _messages = {
@@ -54,6 +55,8 @@ class CommandStatus:
         15: 'error: camera is not acquiring',
 
         20: 'error: requested temperature is outside the supported limits',
+        21: 'error: requested filter is not installed in the filter wheel',
+        22: 'error: invalid gain value',
         32: 'error: window extends outside the bounds of the sensor',
 
         -100: 'error: terminated by user',

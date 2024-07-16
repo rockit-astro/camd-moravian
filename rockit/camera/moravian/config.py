@@ -109,6 +109,13 @@ CONFIG_SCHEMA = {
             'type': 'number',
             'minimum': 0
         },
+        'filters': {
+            'type': 'array',
+            'minItems': 0,
+            'items': {
+                'type': 'string'
+            }
+        },
         'header_card_capacity': {
             'type': 'integer',
             'minimum': 0
@@ -162,6 +169,7 @@ class Config:
         self.use_gps = config_json['use_gps']
         self.use_shutter = config_json['use_shutter']
         self.row_period_us = config_json['row_period_us']
+        self.filters = config_json.get('filters', [])
         self.header_card_capacity = config_json['header_card_capacity']
         self.cooler_setpoint = config_json['cooler_setpoint']
         self.cooler_update_delay = config_json['cooler_update_delay']

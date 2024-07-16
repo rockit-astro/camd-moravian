@@ -69,8 +69,12 @@ class MoravianInterface:
 
         self._readout_width = 0
         self._readout_height = 0
-
         self._stream_frames = config.stream
+
+        if config.filters:
+            self._filter = config.filters[0]
+        else:
+            self._filter = None
 
         # Crop output data to detector coordinates
         self._window_region = [0, 0, 0, 0]
@@ -297,6 +301,7 @@ class MoravianInterface:
                     'exposure': float(self._exposure_time),
                     'gain': self._gain,
                     'stream': self._stream_frames,
+                    'filter': self._filter,
                     'camera_description': self._camera_description,
                     'gps_start_time': gps_start_time,
                     'read_end_time': read_end_time,
@@ -356,6 +361,8 @@ class MoravianInterface:
             driver.gxccd_get_string_parameter.argtypes = [c_void_p, c_int, c_void_p, c_size_t]
             driver.gxccd_set_gain.argtypes = [c_void_p, c_uint16]
             driver.gxccd_set_temperature.argtypes = [c_void_p, c_float]
+            driver.gxccd_reinit_filter_wheel.argtypes = [c_void_p, c_void_p]
+            driver.gxccd_set_filter.argtypes = [c_void_p, c_int]
             driver.gxccd_start_exposure.argtypes = [c_void_p, c_double, c_bool, c_int, c_int, c_int, c_int]
             driver.gxccd_start_exposure.restype = c_int
             driver.gxccd_image_ready.argtypes = [c_void_p, c_void_p]
@@ -425,6 +432,12 @@ class MoravianInterface:
                 if driver.gxccd_set_temperature(handle, c_float(self._config.cooler_setpoint)):
                     print(f'failed to set default temperature: {get_error()}')
                     return CommandStatus.Failed
+
+                if len(self._config.filters) > 1:
+                    filter_count = c_int(0)
+                    if driver.gxccd_reinit_filter_wheel(handle, byref(filter_count)):
+                        print(f'failed to initialize filter wheel: {get_error()}')
+                        return CommandStatus.Failed
 
                 # Regions are 0-indexed x1,x2,y1,2
                 # These are converted to 1-indexed when writing fits headers
@@ -529,6 +542,27 @@ class MoravianInterface:
                 log.info(self._config.log_name, f'Shutter set to {"auto" if enabled else "dark"}')
 
             return CommandStatus.Succeeded
+
+    def set_filter(self, filter_name, quiet):
+        """Set the filter wheel active filter"""
+        if self.is_acquiring:
+            return CommandStatus.CameraNotIdle
+
+        # Invalid filter or no filter wheel installed
+        if len(self._config.filters) < 2 or filter_name not in self._config.filters:
+            return CommandStatus.Failed
+
+        with self._driver_lock:
+            filter_index = self._config.filters.index(filter_name)
+            if self._driver.gxccd_set_filter(self._handle, c_int(filter_index)):
+                print(f'Failed to set filter: {self.last_error}')
+                return CommandStatus.Failed
+            self._filter = filter_name
+
+        if not quiet:
+            log.info(self._config.log_name, f'Filter set to {filter_name}')
+
+        return CommandStatus.Succeeded
 
     def set_exposure(self, exposure, quiet):
         """Set the camera exposure time"""
@@ -658,7 +692,8 @@ class MoravianInterface:
             'cooler_setpoint': self._cooler_setpoint,
             'temperature_locked': False, # TODO
             'stream': self._stream_frames,
-            'shutter_enabled': self._shutter_enabled
+            'shutter_enabled': self._shutter_enabled,
+            'filter': self._filter
         }
 
         data.update(self._polled_state)
@@ -709,6 +744,8 @@ def moravian_process(camd_pipe, config, processing_queue, processing_framebuffer
                     camd_pipe.send(cam.set_shutter_enabled(args['enabled'], args['quiet']))
                 elif command == 'exposure':
                     camd_pipe.send(cam.set_exposure(args['exposure'], args['quiet']))
+                elif command == 'filter':
+                    camd_pipe.send(cam.set_filter(args['filter_name'], args['quiet']))
                 elif command == 'window':
                     camd_pipe.send(cam.set_window(args['window'], args['quiet']))
                 elif command == 'binning':

@@ -18,6 +18,7 @@
   "use_gps": true,
   "use_shutter": true,
   "row_period_us": 45.833,
+  "filters": ["L", "B"],
   "header_card_capacity": 144,
   "camera_id": "H400",
   "output_path": "/data/incoming/",

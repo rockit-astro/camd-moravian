@@ -33,6 +33,7 @@ def run_client_command(config_path, usage_prefix, args):
         'gain': set_gain,
         'stream': set_streaming,
         'shutter': set_shutter,
+        'filter': set_filter,
         'status': status,
         'start': start,
         'stop': stop,
@@ -44,7 +45,9 @@ def run_client_command(config_path, usage_prefix, args):
         return print_usage(usage_prefix)
 
     if args[0] == 'completion':
-        if 'start' in args[-2:]:
+        if 'filter' in args[-2:]:
+            print(' '.join(config.filters))
+        elif 'start' in args[-2:]:
             print('continuous')
         elif 'shutter' in args[-2:]:
             print('auto dark')
@@ -116,6 +119,8 @@ def status(config, *_):
         w = [x + 1 for x in data['window']]
         print(f'   Output window is [b]\\[{w[0]}:{w[1]},{w[2]}:{w[3]}][/b]')
         print(f'   Binning is [b]{data["binning"]}x{data["binning"]}[/b] ([b]{data["binning_method"]}[/b])')
+        if data['filter']:
+            print(f'   Filter is [b]{data["filter"]}[/b]')
     return 0
 
 
@@ -210,6 +215,15 @@ def set_shutter(config, usage_prefix, args):
     return -1
 
 
+def set_filter(config, usage_prefix, args):
+    """Set the active filter"""
+    if len(args) == 1 and (args[0] in config.filters):
+        with config.daemon.connect() as camd:
+            return camd.set_filter(args[0])
+    print(f'usage: {usage_prefix} filter <{"|".join(config.filters)}>')
+    return -1
+
+
 def start(config, usage_prefix, args):
     """Starts an exposure sequence"""
     if len(args) == 1:
@@ -233,7 +247,9 @@ def stop(config, *_):
 
 def initialize(config, *_):
     """Enables the camera driver"""
-    with config.daemon.connect() as camd:
+    # Filter wheel takes a while to initialize, so allow extra time.
+    timeout = 35 if len(config.filters) > 1 else 5
+    with config.daemon.connect(timeout=timeout) as camd:
         return camd.initialize()
 
 
@@ -256,6 +272,7 @@ def print_usage(usage_prefix):
     print('   gain         set cmos gain parameter')
     print('   stream       switch between single-exposure and live mode')
     print('   shutter      set shutter mode')
+    print('   filter       set filter')
     print()
     print('engineering commands:')
     print('   init         connect to and initialize the camera')

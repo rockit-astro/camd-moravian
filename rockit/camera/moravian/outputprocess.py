@@ -137,6 +137,11 @@ def output_process(process_queue, processing_framebuffer, processing_framebuffer
         else:
             shutter_headers = []
 
+        if frame['filter']:
+            filter_headers = [('FILTER', frame['filter'], 'filter in light path')]
+        else:
+            filter_headers = []
+
         header = [
             (None, None, None),
             ('COMMENT', ' ---                DATE/TIME                --- ', ''),
@@ -163,7 +168,7 @@ def output_process(process_queue, processing_framebuffer, processing_framebuffer
             ('CAM-BIN', frame['binning'], '[px] binning factor'),
             ('CAM-WIND', format_sensor_region(window_region), '[x1:x2,y1:y2] readout region (detector coords)'),
             image_region_header,
-        ] + shutter_headers + [
+        ] + shutter_headers + filter_headers + [
             ('EXPCNT', frame['exposure_count'], 'running exposure count since EXPCREF'),
             ('EXPCREF', frame['exposure_count_reference'], 'date the exposure counter was reset'),
         ]
