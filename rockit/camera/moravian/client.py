@@ -54,6 +54,8 @@ def run_client_command(config_path, usage_prefix, args):
             print('warm')
         elif 'window' in args[-2:]:
             print('default')
+        elif 'bin' in args[-3:-1]:
+            print('add mean')
         elif len(args) < 3:
             print(' '.join(commands))
         return 0
@@ -113,7 +115,7 @@ def status(config, *_):
         print(f'   GPS is [b]{gps_status}[/b] ([b]{data["gps_satellites"]}[/b] sats)')
         w = [x + 1 for x in data['window']]
         print(f'   Output window is [b]\\[{w[0]}:{w[1]},{w[2]}:{w[3]}][/b]')
-        print(f'   Binning is [b]{data["binning"]}x{data["binning"]}[/b]')
+        print(f'   Binning is [b]{data["binning"]}x{data["binning"]}[/b] ([b]{data["binning_method"]}[/b])')
     return 0
 
 
@@ -171,20 +173,21 @@ def set_window(config, usage_prefix, args):
 
 def set_binning(config, usage_prefix, args):
     """Set the camera binning"""
-    if len(args) == 1:
-        binning = None
-        if args[0] != 'default':
-            try:
-                binning = int(args[0])
-            except ValueError:
-                print(f'usage: {usage_prefix} bin <pixels>')
-                return -1
+    if len(args) == 1 and args[0] == 'default':
+        binning = method = None
+    elif len(args) == 2 and args[1] in ['sum', 'mean']:
+        try:
+            binning = int(args[0])
+        except ValueError:
+            print(f'usage: {usage_prefix} bin <pixels> <sum|mean>')
+            return -1
+        method = args[1]
+    else:
+        print(f'usage: {usage_prefix} bin <pixels> <sum|mean>')
+        return -1
 
-        with config.daemon.connect() as camd:
-            return camd.set_binning(binning)
-
-    print(f'usage: {usage_prefix} bin <pixels>')
-    return -1
+    with config.daemon.connect() as camd:
+        return camd.set_binning(binning, method)
 
 
 def set_streaming(config, usage_prefix, args):

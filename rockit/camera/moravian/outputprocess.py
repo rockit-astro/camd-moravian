@@ -24,6 +24,7 @@ import shutil
 from astropy.io import fits
 import astropy.units as u
 import numpy as np
+from numpy.lib.stride_tricks import as_strided
 from rockit.common import daemons, log
 
 
@@ -104,23 +105,21 @@ def output_process(process_queue, processing_framebuffer, processing_framebuffer
             data = data[window_region[2]:window_region[3] + 1, window_region[0]:window_region[1] + 1]
 
         if frame['binning'] > 1:
-            nrows, ncols = data.shape
-            n_binned_cols = ncols//frame['binning']
-            n_binned_rows = nrows//frame['binning']
-            binned_cols = np.zeros((nrows, n_binned_cols), dtype=np.uint32)
+            # Create a 4d view of the 2d image, where the two new axes
+            # correspond to the pixels that are to be binned in the x and y axes
+            binning = np.array((frame['binning'], frame['binning']))
+            blocked_shape = tuple(data.shape // binning) + tuple(binning)
+            blocked_strides = tuple(data.strides * binning) + data.strides
+            blocked = as_strided(data, shape=blocked_shape, strides=blocked_strides)
 
-            for i in range(nrows):
-                binned_cols[i] = np.sum(data[i][:n_binned_cols*frame['binning']]
-                                        .reshape(n_binned_cols, frame['binning']), axis=1)
-
-            data = np.zeros((n_binned_rows, n_binned_cols), dtype=np.uint32)
-            for i in range(n_binned_cols):
-                data[:, i] = np.sum(binned_cols[:, i][:n_binned_rows*frame['binning']]
-                                    .reshape(n_binned_rows, frame['binning']), axis=1)
+            if frame['binning_method'] == 'sum':
+                data = np.sum(blocked, axis=(2, 3), dtype=np.uint32)
+            else:
+                data = np.mean(blocked, axis=(2, 3), dtype=np.uint32).astype(np.uint16)
 
             image_region = bin_sensor_region(image_region, frame['binning'])
-            window_region[1] = frame['window_region'][0] + n_binned_cols * frame['binning'] - 1
-            window_region[3] = frame['window_region'][2] + n_binned_rows * frame['binning'] - 1
+            window_region[1] = frame['window_region'][0] + blocked_shape[1] * frame['binning'] - 1
+            window_region[3] = frame['window_region'][2] + blocked_shape[0] * frame['binning'] - 1
 
         if image_region is not None:
             image_region_header = ('IMAG-RGN', format_sensor_region(image_region),

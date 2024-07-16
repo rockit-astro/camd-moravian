@@ -13,6 +13,7 @@
   "framebuffer_bytes": 1514004480,
   "gain": 2750,
   "binning": 1,
+  "binning_method": "sum",
   "stream": false,
   "use_gps": true,
   "use_shutter": true,

@@ -28,8 +28,9 @@ CONFIG_SCHEMA = {
         'daemon', 'pipeline_daemon', 'pipeline_handover_timeout', 'log_name', 'control_machines',
         'client_commands_module',
         'camera_serial', 'camera_id', 'cooler_setpoint', 'cooler_update_delay', 'cooler_pwm_step',
-        'worker_processes', 'framebuffer_bytes', 'gain', 'binning', 'stream', 'use_gps', 'use_shutter',
-        'row_period_us', 'header_card_capacity', 'output_path', 'output_prefix', 'expcount_path'
+        'worker_processes', 'framebuffer_bytes', 'gain', 'binning', 'binning_method',
+        'stream', 'use_gps', 'use_shutter', 'row_period_us', 'header_card_capacity',
+        'output_path', 'output_prefix', 'expcount_path'
     ],
     'properties': {
         'daemon': {
@@ -90,6 +91,10 @@ CONFIG_SCHEMA = {
             'type': 'integer',
             'minimum': 1,
             'maximum': 10656,
+        },
+        'binning_method': {
+            'type': 'string',
+            'enum': ['sum', 'mean'],
         },
         'stream': {
             'type': 'boolean',
@@ -152,6 +157,7 @@ class Config:
         self.framebuffer_bytes = config_json['framebuffer_bytes']
         self.gain = config_json['gain']
         self.binning = config_json['binning']
+        self.binning_method = config_json['binning_method']
         self.stream = config_json['stream']
         self.use_gps = config_json['use_gps']
         self.use_shutter = config_json['use_shutter']
