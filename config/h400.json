@@ -14,6 +14,8 @@
   "gain": 2750,
   "binning": 1,
   "stream": false,
+  "use_gps": true,
+  "row_period_us": 45.833,
   "header_card_capacity": 144,
   "camera_id": "H400",
   "output_path": "/data/incoming/",

@@ -134,7 +134,7 @@ class MoravianInterface:
         self._driver_lost_camera = False
 
         threading.Thread(target=self.__status_thread, daemon=True).start()
-        
+
         self._polled_state = {
             'chip_temp': 0,
             'heatsink_temp': 0,
@@ -262,18 +262,20 @@ class MoravianInterface:
                         else:
                             self._driver.gxccd_read_image(self._handle, byref(cdata), frame_size)
 
+                        gps_start_time = None
                         read_end_time = Time.now()
 
-                        res = self._driver.gxccd_get_image_time_stamp(
-                            self._handle, byref(year), byref(month), byref(day),
-                            byref(hour), byref(minute), byref(second))
+                        if self._config.use_gps:
+                            res = self._driver.gxccd_get_image_time_stamp(
+                                self._handle, byref(year), byref(month), byref(day),
+                                byref(hour), byref(minute), byref(second))
 
-                        gps_date = f'{year.value:04d}-{month.value:02d}-{day.value:02d}'
-                        gps_time = f'{hour.value:02d}:{minute.value:02d}:{second.value:06.3f}'
-                        gps_start_time = f'{gps_date}T{gps_time}'
-                        if res != 0:
-                            gps_start_time = None
-                            print('error querying timestamp:', self.last_error)
+                            if res == 0:
+                                gps_date = f'{year.value:04d}-{month.value:02d}-{day.value:02d}'
+                                gps_time = f'{hour.value:02d}:{minute.value:02d}:{second.value:06.3f}'
+                                gps_start_time = Time(f'{gps_date}T{gps_time}')
+                            else:
+                                print('error querying timestamp:', self.last_error)
 
                 if self._stop_acquisition or self._processing_stop_signal.value:
                     # Return unused slot back to the queue to simplify cleanup
@@ -285,7 +287,7 @@ class MoravianInterface:
                     'data_width': self._readout_width,
                     'data_height': self._readout_height,
                     'requested_exposure': float(self._exposure_time),
-                    'lineperiod': 0,
+                    'row_period': self._config.row_period_us * 1e-6,
                     'exposure': float(self._exposure_time),
                     'gain': self._gain,
                     'stream': self._stream_frames,

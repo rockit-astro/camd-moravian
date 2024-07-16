@@ -72,7 +72,7 @@ def output_process(process_queue, processing_framebuffer, processing_framebuffer
         processing_framebuffer_offsets.put(frame['data_offset'])
 
         # Estimate frame end time based on when we finished reading out
-        end_offset = -frame['lineperiod'] * (frame['data_height'] - 2 * (frame['window_region'][2] // 2))
+        end_offset = -frame['row_period'] * (frame['data_height'] - 2 * frame['window_region'][2])
 
         start_offset = end_offset - frame['exposure']
         end_time = (frame['read_end_time'] + end_offset * u.s).strftime('%Y-%m-%dT%H:%M:%S.%f')
@@ -83,8 +83,12 @@ def output_process(process_queue, processing_framebuffer, processing_framebuffer
             ('TIME-SRC', 'NTP', 'DATE-OBS is estimated from NTP-synced PC clock'),
         ]
 
-        # TODO
-        if frame['gps_start_time'] and False:
+        if frame['gps_start_time']:
+            # Offset due to frame windowing
+            offset = frame['row_period'] * frame['window_region'][2]
+
+            start_time = (frame['gps_start_time'] + offset * u.s).strftime('%Y-%m-%dT%H:%M:%S.%f')
+            end_time = (frame['gps_start_time'] + (frame['exposure'] + offset) * u.s).strftime('%Y-%m-%dT%H:%M:%S.%f')
             date_headers = [
                 ('DATE-OBS', start_time, '[utc] row 0 exposure start time'),
                 ('DATE-END', end_time, '[utc] row 0 exposure end time'),
@@ -135,9 +139,7 @@ def output_process(process_queue, processing_framebuffer, processing_framebuffer
         ] + date_headers + [
             ('GPS-SATS', frame['gps_satellites'], 'number of GPS satellites visible'),
             ('EXPTIME', round(frame['exposure'], 3), '[s] actual exposure length'),
-            #('EXPRQSTD', round(frame['requested_exposure'], 3), '[s] requested exposure length'),
-            #('EXPCADNC', round(frame['frameperiod'], 3), '[s] exposure cadence'),
-            ('ROWDELTA', round(frame['lineperiod'] * 1e6, 3), '[us] rolling shutter unbinned row period'),
+            ('ROWDELTA', round(frame['row_period'] * 1e6, 3), '[us] rolling shutter unbinned row period'),
             ('PC-RDEND', frame['read_end_time'].strftime('%Y-%m-%dT%H:%M:%S.%f'),
              '[utc] local PC time when readout completed'),
             (None, None, None),
