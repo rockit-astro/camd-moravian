@@ -97,6 +97,9 @@ class MoravianInterface:
         self._output_directory = pathlib.Path(config.output_path)
         self._output_frame_prefix = config.output_prefix
 
+        # Shutter enabled (opens during exposures), or remains closed
+        self._shutter_enabled = True
+
         # Persistent frame counters
         self._counter_filename = config.expcount_path
         try:
@@ -220,7 +223,8 @@ class MoravianInterface:
             if self._stream_frames:
                 # Start first exposure - subsequent exposures are triggered automatically.
                 with self._driver_lock:
-                    if self._driver.gxccd_start_exposure(self._handle, c_double(self._exposure_time), c_bool(True),
+                    if self._driver.gxccd_start_exposure(self._handle, c_double(self._exposure_time),
+                                                         c_bool(self._shutter_enabled),
                                                          0, 0, self._readout_width, self._readout_height):
                         log.error(self._config.log_name, f'Failed to start exposure sequence: {self.last_error}')
                         return
@@ -231,7 +235,8 @@ class MoravianInterface:
                 if not self._stream_frames:
                     # Start every individual exposure
                     with self._driver_lock:
-                        if self._driver.gxccd_start_exposure(self._handle, c_double(self._exposure_time), c_bool(True),
+                        if self._driver.gxccd_start_exposure(self._handle, c_double(self._exposure_time),
+                                                             c_bool(self._shutter_enabled),
                                                              0, 0, self._readout_width, self._readout_height):
                             log.error(self._config.log_name, f'Failed to start exposure sequence: {self.last_error}')
                             return
@@ -299,6 +304,7 @@ class MoravianInterface:
                     'window_region': self._window_region,
                     'image_region': self._window_region,
                     'binning': self._binning,
+                    'shutter_enabled': self._shutter_enabled,
                     'exposure_count': self._exposure_count,
                     'exposure_count_reference': self._exposure_count_reference,
                     'cooler_setpoint': self._cooler_setpoint,
@@ -504,6 +510,23 @@ class MoravianInterface:
 
             return CommandStatus.Succeeded
 
+    def set_shutter_enabled(self, enabled, quiet):
+        if self.is_acquiring:
+            return CommandStatus.CameraNotIdle
+
+        if not self._config.use_shutter:
+            return CommandStatus.Failed
+
+        if self._shutter_enabled == enabled:
+            return CommandStatus.Succeeded
+
+        with self._driver_lock:
+            self._shutter_enabled = enabled
+
+            if not quiet:
+                log.info(self._config.log_name, f'Shutter set to {"auto" if enabled else "dark"}')
+
+            return CommandStatus.Succeeded
 
     def set_exposure(self, exposure, quiet):
         """Set the camera exposure time"""
@@ -625,7 +648,8 @@ class MoravianInterface:
             'sequence_frame_count': sequence_frame_count,
             'cooler_setpoint': self._cooler_setpoint,
             'temperature_locked': False, # TODO
-            'stream': self._stream_frames
+            'stream': self._stream_frames,
+            'shutter_enabled': self._shutter_enabled
         }
 
         data.update(self._polled_state)
@@ -672,6 +696,8 @@ def moravian_process(camd_pipe, config, processing_queue, processing_framebuffer
                     camd_pipe.send(cam.set_gain(args['gain'], args['quiet']))
                 elif command == 'stream':
                     camd_pipe.send(cam.set_frame_streaming(args['stream'], args['quiet']))
+                elif command == 'shutter':
+                    camd_pipe.send(cam.set_shutter_enabled(args['enabled'], args['quiet']))
                 elif command == 'exposure':
                     camd_pipe.send(cam.set_exposure(args['exposure'], args['quiet']))
                 elif command == 'window':

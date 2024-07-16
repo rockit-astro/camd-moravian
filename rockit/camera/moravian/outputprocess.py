@@ -55,7 +55,7 @@ def format_sensor_region(region):
 
 
 def output_process(process_queue, processing_framebuffer, processing_framebuffer_offsets, stop_signal,
-                   camera_id, camera_serial, header_card_capacity, output_path, log_name,
+                   camera_id, use_shutter, header_card_capacity, output_path, log_name,
                    pipeline_daemon_name, pipeline_handover_timeout):
     """
     Helper process to save frames to disk.
@@ -133,6 +133,11 @@ def output_process(process_queue, processing_framebuffer, processing_framebuffer
         else:
             setpoint_header = ('COMMENT', ' TEMP-SET not available', '')
 
+        if use_shutter:
+            shutter_headers = [('SHUTTER', 'AUTO' if frame['shutter_enabled'] else 'CLOSED', 'shutter mode')]
+        else:
+            shutter_headers = []
+
         header = [
             (None, None, None),
             ('COMMENT', ' ---                DATE/TIME                --- ', ''),
@@ -159,6 +164,7 @@ def output_process(process_queue, processing_framebuffer, processing_framebuffer
             ('CAM-BIN', frame['binning'], '[px] binning factor'),
             ('CAM-WIND', format_sensor_region(window_region), '[x1:x2,y1:y2] readout region (detector coords)'),
             image_region_header,
+        ] + shutter_headers + [
             ('EXPCNT', frame['exposure_count'], 'running exposure count since EXPCREF'),
             ('EXPCREF', frame['exposure_count_reference'], 'date the exposure counter was reset'),
         ]

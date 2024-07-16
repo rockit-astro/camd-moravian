@@ -57,7 +57,7 @@ class CameraDaemon:
         for _ in range(config.worker_processes):
             Process(target=output_process, daemon=True, args=(
                 self._processing_queue, self._processing_framebuffer, self._processing_framebuffer_offsets,
-                self._processing_stop_signal, config.camera_id, config.camera_serial,
+                self._processing_stop_signal, config.camera_id, config.use_shutter,
                 config.header_card_capacity, config.output_path, config.log_name,
                 config.pipeline_daemon_name, config.pipeline_handover_timeout)).start()
 
@@ -222,6 +222,18 @@ class CameraDaemon:
             return self.cam_command('stream', stream=stream, quiet=quiet)
 
     @Pyro4.expose
+    def set_shutter(self, enabled, quiet=False):
+        """Enable or disable the shutter"""
+        if not pyro_client_matches(self._config.control_ips):
+            return CommandStatus.InvalidControlIP
+
+        with TryLock(self._command_lock) as success:
+            if not success:
+                return CommandStatus.Blocked
+
+            return self.cam_command('shutter', enabled=enabled, quiet=quiet)
+
+    @Pyro4.expose
     def configure(self, params, quiet=False):
         """Set camera configuration to the requested state
            params should be a dictionary with the following keys:
@@ -231,6 +243,7 @@ class CameraDaemon:
               bin: number of pixels to bin in x,y
               gain: Gain setting
               stream: stream (live) exposures or take individual frames
+              shutter: Enable the shutter (True/False)
            Any properties not specified in params will be reset to its default
 
            The params dictionary should be validated using the
@@ -262,6 +275,9 @@ class CameraDaemon:
 
             gain = params.get('gain', self._config.gain)
             self.cam_command('gain', gain=gain, quiet=quiet)
+
+            shutter = params.get('shutter', True)
+            self.cam_command('shutter', enabled=shutter, quiet=quiet)
 
             return CommandStatus.Succeeded
 

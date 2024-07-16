@@ -28,8 +28,8 @@ CONFIG_SCHEMA = {
         'daemon', 'pipeline_daemon', 'pipeline_handover_timeout', 'log_name', 'control_machines',
         'client_commands_module',
         'camera_serial', 'camera_id', 'cooler_setpoint', 'cooler_update_delay', 'cooler_pwm_step',
-        'worker_processes', 'framebuffer_bytes', 'gain', 'binning', 'stream', 'use_gps', 'row_period_us',
-        'header_card_capacity', 'output_path', 'output_prefix', 'expcount_path'
+        'worker_processes', 'framebuffer_bytes', 'gain', 'binning', 'stream', 'use_gps', 'use_shutter',
+        'row_period_us', 'header_card_capacity', 'output_path', 'output_prefix', 'expcount_path'
     ],
     'properties': {
         'daemon': {
@@ -97,6 +97,9 @@ CONFIG_SCHEMA = {
         'use_gps': {
             'type': 'boolean',
         },
+        'use_shutter': {
+            'type': 'boolean',
+        },
         'row_period_us': {
             'type': 'number',
             'minimum': 0
@@ -151,6 +154,7 @@ class Config:
         self.binning = config_json['binning']
         self.stream = config_json['stream']
         self.use_gps = config_json['use_gps']
+        self.use_shutter = config_json['use_shutter']
         self.row_period_us = config_json['row_period_us']
         self.header_card_capacity = config_json['header_card_capacity']
         self.cooler_setpoint = config_json['cooler_setpoint']
