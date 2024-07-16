@@ -31,6 +31,7 @@ def run_client_command(config_path, usage_prefix, args):
         'window': set_window,
         'bin': set_binning,
         'gain': set_gain,
+        'stream': set_streaming,
         'status': status,
         'start': start,
         'stop': stop,
@@ -44,6 +45,8 @@ def run_client_command(config_path, usage_prefix, args):
     if args[0] == 'completion':
         if 'start' in args[-2:]:
             print('continuous')
+        elif 'stream' in args[-2:]:
+            print('enable disable')
         elif 'temperature' in args[-2:]:
             print('warm')
         elif 'window' in args[-2:]:
@@ -97,6 +100,7 @@ def status(config, *_):
         if data['cooler_setpoint'] is not None:
             print(f'   Temperature set point is [b]{data["cooler_setpoint"]:.0f}\u00B0C[/b]')
 
+        print(f'   Frame streaming is [b]{"ENABLED" if data["stream"] else "DISABLED"}[/b]')
         print(f'   Exposure time is [b]{data["exposure_time"]:.3f} s[/b]')
         gps_status = '[green]LOCKED[/green]' if data['gps_fix'] else '[red]NOT LOCKED[/red]'
         print(f'   GPS is [b]{gps_status}[/b] ([b]{data["gps_satellites"]}[/b] sats)')
@@ -176,6 +180,16 @@ def set_binning(config, usage_prefix, args):
     return -1
 
 
+def set_streaming(config, usage_prefix, args):
+    """Set the camera streaming mode"""
+    if len(args) == 1 and (args[0] == 'enable' or args[0] == 'disable'):
+        enabled = args[0] == 'enable'
+        with config.daemon.connect() as camd:
+            return camd.set_frame_streaming(enabled)
+    print(f'usage: {usage_prefix} stream <enable|disable>')
+    return -1
+
+
 def start(config, usage_prefix, args):
     """Starts an exposure sequence"""
     if len(args) == 1:
@@ -220,6 +234,7 @@ def print_usage(usage_prefix):
     print('   window       set image geometry')
     print('   bin          set image binning')
     print('   gain         set cmos gain parameter')
+    print('   stream       switch between single-exposure and live mode')
     print()
     print('engineering commands:')
     print('   init         connect to and initialize the camera')

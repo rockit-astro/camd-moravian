@@ -28,7 +28,7 @@ CONFIG_SCHEMA = {
         'daemon', 'pipeline_daemon', 'pipeline_handover_timeout', 'log_name', 'control_machines',
         'client_commands_module',
         'camera_serial', 'camera_id', 'cooler_setpoint', 'cooler_update_delay', 'cooler_pwm_step',
-        'worker_processes', 'framebuffer_bytes', 'gain', 'binning',
+        'worker_processes', 'framebuffer_bytes', 'gain', 'binning', 'stream',
         'header_card_capacity', 'output_path', 'output_prefix', 'expcount_path'
     ],
     'properties': {
@@ -91,6 +91,9 @@ CONFIG_SCHEMA = {
             'min': 1,
             'max': 9600,
         },
+        'stream': {
+            'type': 'boolean',
+        },
         'header_card_capacity': {
             'type': 'integer',
             'min': 0
@@ -139,6 +142,7 @@ class Config:
         self.framebuffer_bytes = config_json['framebuffer_bytes']
         self.gain = config_json['gain']
         self.binning = config_json['binning']
+        self.stream = config_json['stream']
         self.header_card_capacity = config_json['header_card_capacity']
         self.cooler_setpoint = config_json['cooler_setpoint']
         self.cooler_update_delay = config_json['cooler_update_delay']

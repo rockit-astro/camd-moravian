@@ -28,6 +28,7 @@ import json
 import pathlib
 import sys
 import threading
+import time
 import traceback
 from astropy.time import Time
 import astropy.units as u
@@ -68,6 +69,8 @@ class MoravianInterface:
 
         self._readout_width = 0
         self._readout_height = 0
+
+        self._stream_frames = config.stream
 
         # Crop output data to detector coordinates
         self._window_region = [0, 0, 0, 0]
@@ -212,50 +215,34 @@ class MoravianInterface:
                 offset += frame_size
                 framebuffer_slots += 1
 
-            # Start with a bias exposure to clear the image buffer
-            with self._driver_lock:
-                if self._driver.gxccd_start_exposure(self._handle, c_double(self._exposure_time), c_bool(True),
-                                                     0, 0, self._readout_width, self._readout_height):
-                    log.error(self._config.log_name, f'Failed to start exposure sequence: {self.last_error}')
-                    return
-
-                time.sleep(1)
-                cdata = (c_uint8 * frame_size).from_buffer(self._processing_framebuffer, 0)
-                self._driver.gxccd_read_image_exposure(self._handle, byref(cdata), frame_size)
-
-                year = c_int(-1)
-                month = c_int(-1)
-                day = c_int(-1)
-                hour = c_int(-1)
-                minute = c_int(-1)
-                second = c_double(-1.0)
-
-                #res = self._driver.gxccd_get_image_time_stamp(
-                #    self._handle, byref(year), byref(month), byref(day),
-                #    byref(hour), byref(minute), byref(second))
-
-                gps_date = f'{year.value:04d}-{month.value:02d}-{day.value:02d}'
-                gps_time = f'{hour.value:02d}:{minute.value:02d}:{second.value:06.3f}'
-                gps_start_time = f'{gps_date}T{gps_time}'
-                print(gps_time, Time.now())
-            with self._driver_lock:
-                if self._driver.gxccd_start_exposure(self._handle, c_double(self._exposure_time), c_bool(True),
-                                                     0, 0, self._readout_width, self._readout_height):
-                    log.error(self._config.log_name, f'Failed to start exposure sequence: {self.last_error}')
-                    return
-
             ready = c_bool()
-            self._driver.gxccd_image_ready(self._handle, byref(ready))
-            print('before start data', ready)
+
+            if self._stream_frames:
+                # Start first exposure - subsequent exposures are triggered automatically.
+                with self._driver_lock:
+                    if self._driver.gxccd_start_exposure(self._handle, c_double(self._exposure_time), c_bool(True),
+                                                         0, 0, self._readout_width, self._readout_height):
+                        log.error(self._config.log_name, f'Failed to start exposure sequence: {self.last_error}')
+                        return
 
             while not self._stop_acquisition and not self._processing_stop_signal.value:
                 self._sequence_exposure_start_time = Time.now()
+
+                if not self._stream_frames:
+                    # Start every individual exposure
+                    with self._driver_lock:
+                        if self._driver.gxccd_start_exposure(self._handle, c_double(self._exposure_time), c_bool(True),
+                                                             0, 0, self._readout_width, self._readout_height):
+                            log.error(self._config.log_name, f'Failed to start exposure sequence: {self.last_error}')
+                            return
 
                 while True:
                     with self._driver_lock:
                         self._driver.gxccd_image_ready(self._handle, byref(ready))
                     if ready.value or self._stop_acquisition or self._processing_stop_signal.value:
                         break
+
+                    time.sleep(0.01)
 
                 framebuffer_offset = self._processing_framebuffer_offsets.get()
                 cdata = (c_uint8 * frame_size).from_buffer(self._processing_framebuffer, framebuffer_offset)
@@ -270,7 +257,11 @@ class MoravianInterface:
                     second = c_double(-1.0)
 
                     with self._driver_lock:
-                        self._driver.gxccd_read_image_exposure(self._handle, byref(cdata), frame_size)
+                        if self._stream_frames:
+                            self._driver.gxccd_read_image_exposure(self._handle, byref(cdata), frame_size)
+                        else:
+                            self._driver.gxccd_read_image(self._handle, byref(cdata), frame_size)
+
                         read_end_time = Time.now()
 
                         res = self._driver.gxccd_get_image_time_stamp(
@@ -280,7 +271,6 @@ class MoravianInterface:
                         gps_date = f'{year.value:04d}-{month.value:02d}-{day.value:02d}'
                         gps_time = f'{hour.value:02d}:{minute.value:02d}:{second.value:06.3f}'
                         gps_start_time = f'{gps_date}T{gps_time}'
-                        print(gps_time, Time.now())
                         if res != 0:
                             gps_start_time = None
                             print('error querying timestamp:', self.last_error)
@@ -298,6 +288,7 @@ class MoravianInterface:
                     'lineperiod': 0,
                     'exposure': float(self._exposure_time),
                     'gain': self._gain,
+                    'stream': self._stream_frames,
                     'camera_description': self._camera_description,
                     'gps_start_time': gps_start_time,
                     'read_end_time': read_end_time,
@@ -496,6 +487,22 @@ class MoravianInterface:
 
         return CommandStatus.Succeeded
 
+    def set_frame_streaming(self, stream, quiet):
+        if self.is_acquiring:
+            return CommandStatus.CameraNotIdle
+
+        if self._stream_frames == stream:
+            return CommandStatus.Succeeded
+
+        with self._driver_lock:
+            self._stream_frames = stream
+
+            if not quiet:
+                log.info(self._config.log_name, f'Streaming set to {stream}')
+
+            return CommandStatus.Succeeded
+
+
     def set_exposure(self, exposure, quiet):
         """Set the camera exposure time"""
         if self.is_acquiring:
@@ -616,6 +623,7 @@ class MoravianInterface:
             'sequence_frame_count': sequence_frame_count,
             'cooler_setpoint': self._cooler_setpoint,
             'temperature_locked': False, # TODO
+            'stream': self._stream_frames
         }
 
         data.update(self._polled_state)
@@ -660,6 +668,8 @@ def moravian_process(camd_pipe, config, processing_queue, processing_framebuffer
                     camd_pipe.send(cam.set_target_temperature(args['temperature'], args['quiet']))
                 elif command == 'gain':
                     camd_pipe.send(cam.set_gain(args['gain'], args['quiet']))
+                elif command == 'stream':
+                    camd_pipe.send(cam.set_frame_streaming(args['stream'], args['quiet']))
                 elif command == 'exposure':
                     camd_pipe.send(cam.set_exposure(args['exposure'], args['quiet']))
                 elif command == 'window':

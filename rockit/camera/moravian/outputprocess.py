@@ -146,6 +146,7 @@ def output_process(process_queue, processing_framebuffer, processing_framebuffer
             ('FWVER', frame['firmware_version'], 'camera firmware version'),
             ('CAMID', camera_id, 'camera identifier'),
             ('CAMERA', frame['camera_description'], 'camera model and serial number'),
+            ('CAM-TFER', 'STREAM' if frame['stream'] else 'SINGLE', 'frame transfer mode'),
             ('CAM-GAIN', frame['gain'], 'cmos gain setting'),
             ('CAM-TEMP', round(frame['chip_temp'], 2),
              '[deg c] sensor temperature at end of exposure'),
