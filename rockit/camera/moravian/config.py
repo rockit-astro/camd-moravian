@@ -42,7 +42,7 @@ CONFIG_SCHEMA = {
         },
         'pipeline_handover_timeout': {
             'type': 'number',
-            'min': 0
+            'minimum': 0
         },
         'log_name': {
             'type': 'string',
@@ -62,34 +62,34 @@ CONFIG_SCHEMA = {
         },
         'cooler_setpoint': {
             'type': 'number',
-            'min': -20,
-            'max': 30,
+            'minimum': -20,
+            'maximum': 30,
         },
         'cooler_update_delay': {
             'type': 'number',
-            'min': 0
+            'minimum': 0
         },
         'cooler_pwm_step': {
             'type': 'integer',
-            'min': 1
+            'minimum': 1
         },
         'worker_processes': {
             'type': 'integer',
-            'min': 1
+            'minimum': 1
         },
         'framebuffer_bytes': {
             'type': 'integer',
-            'min': 9600*6422*2
+            'minimum': 14208*10656*2
         },
         'gain': {
             'type': 'integer',
-            'min': 0,
-            'max': 100,
+            'minimum': 0,
+            'maximum': 4030,
         },
         'binning': {
             'type': 'integer',
-            'min': 1,
-            'max': 9600,
+            'minimum': 1,
+            'maximum': 10656,
         },
         'stream': {
             'type': 'boolean',
@@ -103,7 +103,7 @@ CONFIG_SCHEMA = {
         },
         'header_card_capacity': {
             'type': 'integer',
-            'min': 0
+            'minimum': 0
         },
         'camera_id': {
             'type': 'string',
