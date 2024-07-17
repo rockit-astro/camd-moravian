@@ -82,7 +82,6 @@ class MoravianInterface:
         self._binning_method = config.binning_method
 
         self._polled_condition = threading.Condition()
-        self._polled_state = {}
         self._cooler_setpoint = config.cooler_setpoint
 
         self._exposure_time = 1
@@ -141,16 +140,17 @@ class MoravianInterface:
         # Detected by way of the temperature/cooler queries returning 0xFFFFFFFF
         self._driver_lost_camera = False
 
-        threading.Thread(target=self.__status_thread, daemon=True).start()
-
         self._polled_state = {
             'chip_temp': 0,
             'heatsink_temp': 0,
             'supply_voltage': 0,
             'cooler_power': 0,
+            'temperature_locked': False,
             'gps_fix': False,
             'gps_satellites': 0
         }
+
+        threading.Thread(target=self.__status_thread, daemon=True).start()
 
 
     @property
@@ -200,6 +200,7 @@ class MoravianInterface:
 
                         state[key] = value.value
 
+                    state['temperature_locked'] = abs(state['chip_temp'] - self._cooler_setpoint) < 0.5
                     self._polled_state = state
 
             with self._polled_condition:
@@ -690,7 +691,6 @@ class MoravianInterface:
             'sequence_frame_limit': self._sequence_frame_limit,
             'sequence_frame_count': sequence_frame_count,
             'cooler_setpoint': self._cooler_setpoint,
-            'temperature_locked': False, # TODO
             'stream': self._stream_frames,
             'shutter_enabled': self._shutter_enabled,
             'filter': self._filter
