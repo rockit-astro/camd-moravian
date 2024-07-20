@@ -475,7 +475,12 @@ class MoravianInterface:
         if self.is_acquiring:
             return CommandStatus.CameraNotIdle
 
-        if temperature is not None and (temperature < -20 or temperature > 30):
+        try:
+            temperature = float(temperature)
+        except ValueError:
+            return CommandStatus.TemperatureOutsideLimits
+
+        if temperature < -20 or temperature > 30:
             return CommandStatus.TemperatureOutsideLimits
 
         with self._driver_lock:
