@@ -148,6 +148,7 @@ def output_process(process_queue, processing_framebuffer, processing_framebuffer
         ] + date_headers + [
             ('GPS-SATS', frame['gps_satellites'], 'number of GPS satellites visible'),
             ('EXPTIME', round(frame['exposure'], 3), '[s] actual exposure length'),
+            ('EXPRQSTD', round(frame['requested_exposure'], 3), '[s] requested exposure length'),
             ('ROWDELTA', round(frame['row_period'] * 1e6, 3), '[us] rolling shutter unbinned row period'),
             ('PC-RDEND', frame['read_end_time'].strftime('%Y-%m-%dT%H:%M:%S.%f'),
              '[utc] local PC time when readout completed'),

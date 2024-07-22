@@ -211,6 +211,10 @@ class MoravianInterface:
            Tagged frames are pushed to the acquisition queue
            for further processing on another thread"""
         framebuffer_slots = 0
+
+        # SDK returns all zeros for shorter exposures!
+        exposure_time = max(float(self._exposure_time), 0.012)
+
         try:
             # Prepare the framebuffer offsets
             if not self._processing_framebuffer_offsets.empty():
@@ -229,7 +233,7 @@ class MoravianInterface:
             if self._stream_frames:
                 # Start first exposure - subsequent exposures are triggered automatically.
                 with self._driver_lock:
-                    if self._driver.gxccd_start_exposure(self._handle, c_double(self._exposure_time),
+                    if self._driver.gxccd_start_exposure(self._handle, c_double(exposure_time),
                                                          c_bool(self._shutter_enabled),
                                                          0, 0, self._readout_width, self._readout_height):
                         log.error(self._config.log_name, f'Failed to start exposure sequence: {self.last_error}')
@@ -241,7 +245,7 @@ class MoravianInterface:
                 if not self._stream_frames:
                     # Start every individual exposure
                     with self._driver_lock:
-                        if self._driver.gxccd_start_exposure(self._handle, c_double(self._exposure_time),
+                        if self._driver.gxccd_start_exposure(self._handle, c_double(exposure_time),
                                                              c_bool(self._shutter_enabled),
                                                              0, 0, self._readout_width, self._readout_height):
                             log.error(self._config.log_name, f'Failed to start exposure sequence: {self.last_error}')
@@ -299,7 +303,7 @@ class MoravianInterface:
                     'data_height': self._readout_height,
                     'requested_exposure': float(self._exposure_time),
                     'row_period': self._config.row_period_us * 1e-6,
-                    'exposure': float(self._exposure_time),
+                    'exposure': float(exposure_time),
                     'gain': self._gain,
                     'stream': self._stream_frames,
                     'filter': self._filter,
