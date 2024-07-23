@@ -487,6 +487,9 @@ class MoravianInterface:
         if temperature < -20 or temperature > 30:
             return CommandStatus.TemperatureOutsideLimits
 
+        if self._cooler_setpoint == temperature:
+            return CommandStatus.Succeeded
+
         with self._driver_lock:
             if self._driver.gxccd_set_temperature(self._handle, c_float(temperature)):
                 print(f'Failed to set target temperature: {self.last_error}')
@@ -508,6 +511,9 @@ class MoravianInterface:
 
         if gain < 0 or gain >= 4096:
             return CommandStatus.GainOutsideLimits
+
+        if self._gain == gain:
+            return CommandStatus.Succeeded
 
         with self._driver_lock:
             if self._driver.gxccd_set_gain(self._handle, c_uint16(self._gain)):
@@ -562,6 +568,9 @@ class MoravianInterface:
         if len(self._config.filters) < 2 or filter_name not in self._config.filters:
             return CommandStatus.Failed
 
+        if self._filter == filter_name:
+            return CommandStatus.Succeeded
+
         with self._driver_lock:
             filter_index = self._config.filters.index(filter_name)
             if self._driver.gxccd_set_filter(self._handle, c_int(filter_index)):
@@ -578,6 +587,9 @@ class MoravianInterface:
         """Set the camera exposure time"""
         if self.is_acquiring:
             return CommandStatus.CameraNotIdle
+
+        if self._exposure_time == exposure:
+            return CommandStatus.Succeeded
 
         self._exposure_time = exposure
         if not quiet:
@@ -625,6 +637,9 @@ class MoravianInterface:
 
         if method not in ['sum', 'mean']:
             return CommandStatus.Failed
+
+        if self._binning == binning and  self._binning_method == method:
+            return CommandStatus.Succeeded
 
         self._binning = binning
         self._binning_method = method
