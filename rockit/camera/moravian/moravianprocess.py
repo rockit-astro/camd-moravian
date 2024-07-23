@@ -509,7 +509,7 @@ class MoravianInterface:
         if self.is_acquiring:
             return CommandStatus.CameraNotIdle
 
-        if gain < 0 or gain >= 4096:
+        if gain < 0 or gain > 4030:
             return CommandStatus.GainOutsideLimits
 
         if self._gain == gain:
