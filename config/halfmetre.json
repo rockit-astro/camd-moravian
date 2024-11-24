@@ -12,7 +12,7 @@
   "worker_processes": 3,
   "framebuffer_bytes": 1514004480,
   "gain": 2750,
-  "binning": 1,
+  "binning": 3,
   "binning_method": "sum",
   "stream": false,
   "use_gps": true,
@@ -20,8 +20,8 @@
   "row_period_us": 45.833,
   "filters": ["L", "g", "r", "i", "I"],
   "header_card_capacity": 144,
-  "camera_id": "H400",
+  "camera_id": "HALFMETRE",
   "output_path": "/data/incoming/",
   "output_prefix": "halfmetre",
-  "expcount_path": "/data/h400-counter.json"
+  "expcount_path": "/data/halfmetre-counter.json"
 }

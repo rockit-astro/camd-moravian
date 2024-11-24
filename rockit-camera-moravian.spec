@@ -18,7 +18,7 @@ mkdir -p %{buildroot}%{_udevrulesdir}
 %{__install} %{_sourcedir}/moravian_camd %{buildroot}%{_bindir}
 %{__install} %{_sourcedir}/moravian_camd@.service %{buildroot}%{_unitdir}
 
-%{__install} %{_sourcedir}/config/h400.json %{buildroot}%{_sysconfdir}/camd
+%{__install} %{_sourcedir}/config/halfmetre.json %{buildroot}%{_sysconfdir}/camd
 
 %package server
 Summary:  Moravian camera server
@@ -32,13 +32,13 @@ Requires: python3-rockit-camera-moravian
 %defattr(0644,root,root,-)
 %{_unitdir}/moravian_camd@.service
 
-%package data-h400
-Summary: H400 camera data
+%package data-halfmetre
+Summary: Half metre camera data
 Group:   Unspecified
-%description data-h400
+%description data-halfmetre
 
-%files data-h400
+%files data-halfmetre
 %defattr(0644,root,root,-)
-%{_sysconfdir}/camd/h400.json
+%{_sysconfdir}/camd/halfmetre.json
 
 %changelog

@@ -37,11 +37,11 @@ The configuration options are:
 
 The automated packaging scripts will push 7 RPM packages to the observatory package repository:
 
-| Package                        | Description                                                                  |
-|--------------------------------|------------------------------------------------------------------------------|
-| rockit-camera-moravian-data    | Contains the json configuration files for the test camera.                   |
-| rockit-camera-moravian-server  | Contains the `moravian_camd` server and systemd service files for the camera server. |
-| python3-rockit-camera-moravian | Contains the python module with shared code.                                 |
+| Package                               | Description                                                                          |
+|---------------------------------------|--------------------------------------------------------------------------------------|
+| rockit-camera-moravian-data-halfmetre | Contains the json configuration files for the half metre camera.                     |
+| rockit-camera-moravian-server         | Contains the `moravian_camd` server and systemd service files for the camera server. |
+| python3-rockit-camera-moravian        | Contains the python module with shared code.                                         |
 
 ```
 sudo systemctl enable --now moravian_camd.service@<config>
